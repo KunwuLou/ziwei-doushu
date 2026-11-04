@@ -7,14 +7,24 @@
 
 set -uo pipefail
 
-# ---- 定位项目目录（支持放在项目内或项目外一层）----
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$HERE/package.json" ]; then
-  APP_DIR="$HERE"
-elif [ -f "$HERE/ziwei-doushu/package.json" ]; then
-  APP_DIR="$HERE/ziwei-doushu"
-else
-  echo "❌ 找不到项目目录（需要包含 package.json 的 ziwei-doushu 文件夹）"
+# ---- 定位项目目录 ----
+# 支持四种摆放方式，避免"根目录快捷方式"和"仓库内脚本"各存一份而漂移：
+#   1. 脚本就在项目根（package.json 同级）
+#   2. 脚本在 scripts/ 子目录（仓库内）
+#   3. 脚本在项目外一层，旁边有 ziwei-doushu/
+#   4. 从别处 symlink 到本脚本（BASH_SOURCE 指向链接路径）
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+APP_DIR=""
+for cand in "$HERE" "$HERE/.." "$HERE/ziwei-doushu" "$HERE/../ziwei-doushu"; do
+  [ -f "$cand/package.json" ] || continue
+  if grep -q '"ziwei' "$cand/package.json" 2>/dev/null; then
+    APP_DIR="$(cd "$cand" && pwd -P)"
+    break
+  fi
+done
+
+if [ -z "$APP_DIR" ]; then
+  echo "❌ 找不到紫微斗数项目目录（需要在含 ziwei package.json 的目录、或其 scripts/ 子目录、或项目外一层运行）"
   echo "   当前脚本位置：$HERE"
   echo
   read -r -n 1 -s -p "按任意键关闭…"; echo; exit 1
